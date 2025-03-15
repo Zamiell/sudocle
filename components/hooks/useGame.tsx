@@ -434,6 +434,8 @@ function digitsReducer(
   digits: Map<number, Digit>,
   action: DigitsAction,
   selection: Set<number>,
+  cornerMarks?: Map<number, Set<string | number>>,
+  centreMarks?: Map<number, Set<string | number>>,
 ): boolean {
   let changed = false
 
@@ -458,6 +460,64 @@ function digitsReducer(
               discovered: false,
             })
             changed = true
+            
+            // After placing a digit, automatically remove invalid corner and center marks
+            if (cornerMarks && centreMarks) {
+              const [x, y] = ktoxy(sc)
+              
+              // Function to clear a specific mark from cells in the same row, column, or box
+              const clearMarkInRelatedCells = (
+                marksMap: Map<number, Set<string | number>>, 
+                digitToRemove: number | string
+              ) => {
+                // Clear from same row
+                for (let col = 0; col < 9; col++) {
+                  if (col !== x) {
+                    const k = xytok(col, y)
+                    const marks = marksMap.get(k)
+                    if (marks && marks.has(digitToRemove)) {
+                      marks.delete(digitToRemove)
+                      if (marks.size === 0) marksMap.delete(k)
+                      console.log(`Removed mark ${digitToRemove} from cell [${col}, ${y}] (same row)`)
+                    }
+                  }
+                }
+                
+                // Clear from same column
+                for (let row = 0; row < 9; row++) {
+                  if (row !== y) {
+                    const k = xytok(x, row)
+                    const marks = marksMap.get(k)
+                    if (marks && marks.has(digitToRemove)) {
+                      marks.delete(digitToRemove)
+                      if (marks.size === 0) marksMap.delete(k)
+                      console.log(`Removed mark ${digitToRemove} from cell [${x}, ${row}] (same column)`)
+                    }
+                  }
+                }
+                
+                // Clear from same 3x3 box
+                const boxStartX = Math.floor(x / 3) * 3
+                const boxStartY = Math.floor(y / 3) * 3
+                for (let row = boxStartY; row < boxStartY + 3; row++) {
+                  for (let col = boxStartX; col < boxStartX + 3; col++) {
+                    if (row !== y || col !== x) {
+                      const k = xytok(col, row)
+                      const marks = marksMap.get(k)
+                      if (marks && marks.has(digitToRemove)) {
+                        marks.delete(digitToRemove)
+                        if (marks.size === 0) marksMap.delete(k)
+                        console.log(`Removed mark ${digitToRemove} from cell [${col}, ${row}] (same box)`)
+                      }
+                    }
+                  }
+                }
+              }
+              
+              // Clear the placed digit from corner marks and center marks
+              clearMarkInRelatedCells(cornerMarks, action.digit)
+              clearMarkInRelatedCells(centreMarks, action.digit)
+            }
           }
         }
       }
@@ -866,6 +926,8 @@ function gameReducerNoUndo(state: GameState, mode: string, action: Action) {
         state.digits,
         action,
         filterGivens(filteredDigits, state.selection),
+        state.cornerMarks,
+        state.centreMarks
       )
 
       if (changed && state.data.fogLights !== undefined) {
