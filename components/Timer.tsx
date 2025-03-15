@@ -80,18 +80,22 @@ const Timer = ({ solved }: TimerProps) => {
 
   return (
     <>
-      <div className="flex items-center leading-none">
+      <div
+        className={`flex items-center leading-none ${solved ? "text-green-500 font-medium" : ""}`}
+      >
         {h > 0 && <>{("" + h).padStart(2, "0")}:</>}
         {("" + m).padStart(2, "0")}:{("" + s).padStart(2, "0")}
-        <div
-          className="cursor-pointer pl-0.5 h-3 flex items-center"
-          onClick={onPause}
-        >
-          <Pause
-            stroke="none"
-            className="[&_rect]:[rx:1] leading-none h-[0.7rem] fill-fg"
-          />
-        </div>
+        {!solved && (
+          <div
+            className="cursor-pointer pl-0.5 h-3 flex items-center"
+            onClick={onPause}
+          >
+            <Pause
+              stroke="none"
+              className="[&_rect]:[rx:1] leading-none h-[0.7rem] fill-fg"
+            />
+          </div>
+        )}
       </div>
       {continueVisible && (
         <div className="fixed inset-0 bg-bg/75 flex justify-center items-center z-50 backdrop-blur-lg">
@@ -101,6 +105,26 @@ const Timer = ({ solved }: TimerProps) => {
             </div>
             <div className="w-16 text-[0.6rem] mt-0.5">
               <Button onClick={onContinue}>Continue</Button>
+            </div>
+          </div>
+        </div>
+      )}
+      {solved && (
+        <div className="fixed inset-0 bg-bg/75 flex justify-center items-center z-50 backdrop-blur-lg">
+          <div className="flex flex-col justify-center items-center">
+            <div className="font-medium pt-5 flex items-center text-lg mb-4 text-green-500">
+              🎉 Puzzle solved! 🎉
+            </div>
+            <div className="text-center mb-4">
+              <div>
+                Time: {h > 0 ? `${h}h ` : ""}
+                {m}m {s}s
+              </div>
+            </div>
+            <div className="w-32 text-[0.6rem] mt-0.5">
+              <Button onClick={() => (window.location.href = "/")}>
+                New Puzzle
+              </Button>
             </div>
           </div>
         </div>

@@ -1923,13 +1923,15 @@ const Grid = ({
         highlightContainerRef.current.removeChildren()
         return highlightContainerRef.current
       }
-      
+
       // Check if we have the grid element
       if (!gridElement.current) {
-        console.log("Grid element is not available for highlight container, waiting until next render cycle")
+        console.log(
+          "Grid element is not available for highlight container, waiting until next render cycle",
+        )
         return null
       }
-      
+
       // Otherwise create a new container
       const container = new Container()
       container.zIndex = 1000 // Very high zIndex
@@ -1939,25 +1941,25 @@ const Grid = ({
       console.log("Created new custom highlights container")
       return container
     }
-    
+
     // Get the container
     const container = getHighlightContainer()
-    
+
     // If we don't have a container, skip highlighting for this render
     if (!container) {
       console.log("Skipping highlight rendering - no container available")
       return
     }
-    
+
     // Constants for highlighting
     const SPECIAL_ALPHA = 0.7 // Alpha value for special highlights
     const ROW_COL_ALPHA = 0.15 // Same row or column
     const BLUE_COLOR = 0x00ccff // Blue for 2 unhighlighted cells
     const RED_COLOR = 0xff0000 // Red for 1 unhighlighted cell
-    
+
     // Clear the container
     container.removeChildren()
-    
+
     // First, clear all selection highlights and reset alpha
     selectionElements.current.forEach(s => {
       s.visible = false
@@ -1970,19 +1972,30 @@ const Grid = ({
         s.visible = true
       }
     })
-    
+
     // Track cells with special highlighting and their priority
     // Higher number means higher priority (red > blue > yellow)
-    const highlightedCells = new Map<number, { color: number; priority: number }>()
-    
+    const highlightedCells = new Map<
+      number,
+      { color: number; priority: number }
+    >()
+
     // Helper function to add or update highlighted cell based on priority
-    const addHighlightedCell = (cellK: number, color: number, priority: number) => {
+    const addHighlightedCell = (
+      cellK: number,
+      color: number,
+      priority: number,
+    ) => {
       const existing = highlightedCells.get(cellK)
       if (!existing || priority > existing.priority) {
-        console.log(`Setting highlight for cell ${cellK} to color ${color.toString(16)} with priority ${priority}`)
+        console.log(
+          `Setting highlight for cell ${cellK} to color ${color.toString(16)} with priority ${priority}`,
+        )
         highlightedCells.set(cellK, { color, priority })
       } else {
-        console.log(`Not updating cell ${cellK} - already has color ${existing.color.toString(16)} with priority ${existing.priority} vs new priority ${priority}`)
+        console.log(
+          `Not updating cell ${cellK} - already has color ${existing.color.toString(16)} with priority ${existing.priority} vs new priority ${priority}`,
+        )
       }
     }
 
@@ -2110,7 +2123,9 @@ const Grid = ({
                 // Check if this cell has corner marks matching the selected digit
                 const cornerMarks = game.cornerMarks.get(cellK)
                 if (cornerMarks) {
-                  console.log(`Cell ${cellK} has corner marks: ${Array.from(cornerMarks)}, checking for: ${selectedDigit.digit}, type: ${typeof selectedDigit.digit}`)
+                  console.log(
+                    `Cell ${cellK} has corner marks: ${Array.from(cornerMarks)}, checking for: ${selectedDigit.digit}, type: ${typeof selectedDigit.digit}`,
+                  )
                   if (cornerMarks.has(selectedDigit.digit) && isEmpty) {
                     cornerMarkCells.push(cellK)
                     console.log(
@@ -2162,7 +2177,7 @@ const Grid = ({
                 console.log(
                   `Registering special cell at [${x}, ${y}], k=${cellK}, color=${highlightColor.toString(16)}`,
                 )
-                
+
                 // Set priorities: red (4) > blue (3) > yellow (0)
                 const priority = highlightColor === RED_COLOR ? 4 : 3
                 addHighlightedCell(cellK, highlightColor, priority)
@@ -2175,56 +2190,68 @@ const Grid = ({
               console.log(
                 `Found box with exactly two cells containing corner mark ${selectedDigit.digit}`,
               )
-              
+
               // First dump all the corner mark info for debugging
               console.log("All corner marks in this box:")
               cornerMarkCells.forEach(cellK => {
                 const cornerMarks = game.cornerMarks.get(cellK)
-                console.log(`Cell ${cellK}: corner marks = ${cornerMarks ? Array.from(cornerMarks) : 'none'}`)
+                console.log(
+                  `Cell ${cellK}: corner marks = ${cornerMarks ? Array.from(cornerMarks) : "none"}`,
+                )
               })
-              
+
               // First, check if these cells are valid placements according to Sudoku rules
               // by checking if they would violate row, column, or box constraints
               const validCornerMarkCells = cornerMarkCells.filter(cellK => {
                 const [cx, cy] = ktoxy(cellK)
                 let isValid = true
-                
+
                 // Debug info
-                console.log(`Checking validity of cell ${cellK} at [${cx}, ${cy}]`)
-                
+                console.log(
+                  `Checking validity of cell ${cellK} at [${cx}, ${cy}]`,
+                )
+
                 // Check if this cell would violate Sudoku rules
                 // by being in the same row, column, or box as an existing instance of this digit
                 game.digits.forEach((digit, k) => {
                   if (digit.digit === selectedDigit.digit) {
                     const [dx, dy] = ktoxy(k)
-                    
+
                     // Check if in same row, column, or box
                     const inSameRow = cy === dy
                     const inSameCol = cx === dx
-                    const inSameBox = 
+                    const inSameBox =
                       Math.floor(cx / 3) === Math.floor(dx / 3) &&
                       Math.floor(cy / 3) === Math.floor(dy / 3)
-                    
+
                     if (inSameRow || inSameCol || inSameBox) {
-                      console.log(`  Invalid - conflicts with digit at [${dx}, ${dy}]`)
+                      console.log(
+                        `  Invalid - conflicts with digit at [${dx}, ${dy}]`,
+                      )
                       isValid = false
                     }
                   }
                 })
-                
+
                 // Verify again that this cell actually has the corner mark
                 const cornerMarks = game.cornerMarks.get(cellK)
                 if (!cornerMarks || !cornerMarks.has(selectedDigit.digit)) {
-                  console.log(`  Invalid - cell no longer has corner mark ${selectedDigit.digit}`)
+                  console.log(
+                    `  Invalid - cell no longer has corner mark ${selectedDigit.digit}`,
+                  )
                   isValid = false
                 }
-                
-                console.log(`  Cell ${cellK} is ${isValid ? 'valid' : 'invalid'} for corner mark ${selectedDigit.digit}`)
+
+                console.log(
+                  `  Cell ${cellK} is ${isValid ? "valid" : "invalid"} for corner mark ${selectedDigit.digit}`,
+                )
                 return isValid
               })
-              
-              console.log(`Found ${cornerMarkCells.length} corner mark cells, ${validCornerMarkCells.length} are valid according to Sudoku rules`)
-              
+
+              console.log(
+                `Found ${cornerMarkCells.length} corner mark cells, ${validCornerMarkCells.length} are valid according to Sudoku rules`,
+              )
+
               // Only if both cells are valid according to Sudoku rules, highlight them
               if (validCornerMarkCells.length === 2) {
                 // Highlight cells directly without using priority system
@@ -2233,19 +2260,21 @@ const Grid = ({
                   console.log(
                     `Highlighting corner mark cell at [${x}, ${y}], k=${cellK} directly with blue`,
                   )
-                  
+
                   // Instead of disabling yellow highlights, just add to the priority system
                   // This ensures the highlight actually appears
                   const priority = 3 // Blue priority
-                  console.log(`Adding blue highlight for corner mark cell ${cellK} with priority ${priority}`)
+                  console.log(
+                    `Adding blue highlight for corner mark cell ${cellK} with priority ${priority}`,
+                  )
                   addHighlightedCell(cellK, BLUE_COLOR, priority)
-                  
+
                   // We'll add the highlight through the priority system
                   // No need for a direct approach since we refactored the highlighting system
                 })
               }
             }
-            
+
             // NEW FEATURE: Check for naked pairs in center markings that include the selected digit
             // Only proceed if we have a selected digit
             if (selectedDigit) {
@@ -2264,52 +2293,63 @@ const Grid = ({
                   }
                 }
               }
-              
+
               // Now check for naked pairs (cells with exactly the same 2 center marks)
               if (centreMarkCells.length >= 2) {
-                console.log(`Checking ${centreMarkCells.length} cells with center marks containing ${selectedDigit.digit}`)
-                
+                console.log(
+                  `Checking ${centreMarkCells.length} cells with center marks containing ${selectedDigit.digit}`,
+                )
+
                 // Group cells by their center mark content (as a sorted string)
                 const cellsByCentreMarks = new Map<string, number[]>()
                 centreMarkCells.forEach(cellK => {
                   const marks = game.centreMarks.get(cellK)
-                  if (marks && marks.size === 2) { // Only interested in cells with exactly 2 center marks
+                  if (marks && marks.size === 2) {
+                    // Only interested in cells with exactly 2 center marks
                     const marksArray = Array.from(marks).sort()
-                    const marksKey = marksArray.join(',')
-                    
+                    const marksKey = marksArray.join(",")
+
                     if (!cellsByCentreMarks.has(marksKey)) {
                       cellsByCentreMarks.set(marksKey, [])
                     }
                     cellsByCentreMarks.get(marksKey)!.push(cellK)
-                    console.log(`Cell ${cellK} has center marks: ${marksArray}, key: ${marksKey}`)
+                    console.log(
+                      `Cell ${cellK} has center marks: ${marksArray}, key: ${marksKey}`,
+                    )
                   }
                 })
-                
+
                 // Check each group for pairs
                 cellsByCentreMarks.forEach((cells, marksKey) => {
                   // Only highlight if it's a pair (exactly 2 cells with the same center marks)
                   if (cells.length === 2) {
                     // Convert the key back to an array to check if it contains the selected digit
-                    const markDigits = marksKey.split(',').map(d => {
+                    const markDigits = marksKey.split(",").map(d => {
                       // Handle both string and number conversions
                       return isNaN(Number(d)) ? d : Number(d)
                     })
-                    
+
                     // Verify again that the naked pair contains the selected digit
                     if (markDigits.includes(selectedDigit.digit)) {
-                      console.log(`Found naked pair with digits [${marksKey}] including selected digit ${selectedDigit.digit} in cells: ${cells}`)
-                      
+                      console.log(
+                        `Found naked pair with digits [${marksKey}] including selected digit ${selectedDigit.digit} in cells: ${cells}`,
+                      )
+
                       // Highlight these cells with blue
                       cells.forEach(cellK => {
                         const [x, y] = ktoxy(cellK)
-                        console.log(`Highlighting naked pair cell at [${x}, ${y}], k=${cellK} with blue`)
-                        
+                        console.log(
+                          `Highlighting naked pair cell at [${x}, ${y}], k=${cellK} with blue`,
+                        )
+
                         // Add to highlight system with same priority as corner pairs
                         const priority = 3 // Blue priority
                         addHighlightedCell(cellK, BLUE_COLOR, priority)
                       })
                     } else {
-                      console.log(`Ignoring naked pair [${marksKey}] as it doesn't include selected digit ${selectedDigit.digit}`)
+                      console.log(
+                        `Ignoring naked pair [${marksKey}] as it doesn't include selected digit ${selectedDigit.digit}`,
+                      )
                     }
                   }
                 })
@@ -2319,20 +2359,22 @@ const Grid = ({
         }
       }
     }
-    
+
     // Now apply all the special highlights based on priority
-    console.log(`Applying ${highlightedCells.size} special highlights for potential cells`)
+    console.log(
+      `Applying ${highlightedCells.size} special highlights for potential cells`,
+    )
     if (highlightedCells.size > 0) {
       // Set this container to sort by zIndex
       container.sortableChildren = true
-      
+
       // Process each highlighted cell
       highlightedCells.forEach((highlight, cellK) => {
         const [x, y] = ktoxy(cellK)
         console.log(
           `Applying highlight to cell at [${x}, ${y}], k=${cellK}, color=${highlight.color.toString(16)}, priority=${highlight.priority}`,
         )
-  
+
         try {
           // Create graphics for the highlight
           const specialHighlight = new Graphics()
@@ -2344,35 +2386,37 @@ const Grid = ({
             cellSize * cellSizeFactor.current - 1,
           )
           specialHighlight.endFill()
-          
+
           // Set the zIndex based on priority
           specialHighlight.zIndex = highlight.priority + 5
-  
+
           // Position it using coordinates
           specialHighlight.x = x * cellSize * cellSizeFactor.current
           specialHighlight.y = y * cellSize * cellSizeFactor.current
-  
+
           // Add to container
           container.addChild(specialHighlight)
-  
+
           console.log(
             `  Added direct highlight at [${x}, ${y}], k=${cellK}, color=${highlight.color.toString(16)}, zIndex=${specialHighlight.zIndex}`,
           )
-          
+
           // If this is a blue highlight for a corner mark, make it more visible for debugging
           if (highlight.color === BLUE_COLOR && highlight.priority === 3) {
-            console.log(`  This is a blue corner mark highlight! Making it more visible.`)
+            console.log(
+              `  This is a blue corner mark highlight! Making it more visible.`,
+            )
             specialHighlight.alpha = 0.8 // Make it more visible
           }
         } catch (e) {
           console.error(`  Error adding special highlight: ${e}`)
         }
       })
-      
+
       // Force sorting by zIndex
       container.sortChildren()
     }
-    
+
     // Trigger render
     renderNow()
   }, [game.selection, game.digits, game.cornerMarks, renderNow])

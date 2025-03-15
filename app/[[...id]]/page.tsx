@@ -392,18 +392,18 @@ const IndexPage = () => {
                 selectedDigit.digit === 1 ? 9 : selectedDigit.digit - 1
             }
           }
-          
+
           // Function to count how many instances of a digit exist
           const countDigitInstances = (digit: number): number => {
             let count = 0
-            game.digits.forEach((d) => {
+            game.digits.forEach(d => {
               if (typeof d.digit === "number" && d.digit === digit) {
                 count++
               }
             })
             return count
           }
-          
+
           // Skip digits that already have 9 instances filled in
           let skippedDigits = 0
           while (countDigitInstances(targetDigit) >= 9 && skippedDigits < 9) {
@@ -455,7 +455,7 @@ const IndexPage = () => {
         }
 
         e.preventDefault()
-      // Removed Meta/Control, Shift, and Alt key handlers for temporary mode switching
+        // Removed Meta/Control, Shift, and Alt key handlers for temporary mode switching
       } else if ((e.key === "z" || e.key === "Z") && (e.metaKey || e.ctrlKey)) {
         updateGame({
           type: e.shiftKey ? TYPE_REDO : TYPE_UNDO,
