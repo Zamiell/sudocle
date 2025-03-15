@@ -9,10 +9,12 @@ import {
   PenLinesAction,
   SelectionAction,
   TYPE_DIGITS,
+  TYPE_FILL_CENTER_MARKS,
+  TYPE_MODE,
   TYPE_PENLINES,
   TYPE_SELECTION,
 } from "../lib/Actions"
-import { MODE_PEN } from "../lib/Modes"
+import { MODE_CENTRE, MODE_PEN } from "../lib/Modes"
 import { getRGBColor } from "../lib/colorutils"
 import { hasFog, ktoxy, pltok, xytok } from "../lib/utils"
 import { Arrow, DataCell, FogLight, Line, Overlay } from "../types/Data"
@@ -686,8 +688,25 @@ const Grid = ({
           action: ACTION_REMOVE,
         })
       }
+
+      // Add the "f" key shortcut to fill in center marks with valid possibilities
+      if (e.key === "f" || e.key === "F") {
+        // Only proceed if there's a selection with at least one cell
+        if (game.selection.size > 0) {
+          // Collect all cells that need processing
+          const selectedCells = [...game.selection]
+
+          // Use our new action type to handle everything in one go
+          updateGame({
+            type: TYPE_FILL_CENTER_MARKS,
+            cells: selectedCells,
+          })
+
+          e.preventDefault()
+        }
+      }
     },
-    [updateGame],
+    [updateGame, game.selection, game.digits, game.mode],
   )
 
   function onBackgroundClick(e: MouseEvent) {
@@ -1893,6 +1912,13 @@ const Grid = ({
   ])
 
   useEffect(() => {
+    // Clear any existing custom highlights
+    const customHighlights = (window as any).customHighlights
+    if (customHighlights) {
+      console.log("Clearing previous custom highlights")
+      customHighlights.removeChildren()
+    }
+
     // First, clear all selection highlights and reset alpha
     selectionElements.current.forEach(s => {
       s.visible = false
@@ -1912,25 +1938,71 @@ const Grid = ({
       const selectedDigit = game.digits.get(selectedCellK)
       const [selectedX, selectedY] = ktoxy(selectedCellK)
 
-      // Three types of highlighting with different alpha levels:
+      // Types of highlighting with different alpha levels:
       const SAME_DIGIT_ALPHA = 0.2 // Same digit value
       const ROW_COL_ALPHA = 0.2 // Same row or column
+      const SPECIAL_ALPHA = 0.5 // Special cells (higher alpha for visibility)
+      const BLUE_COLOR = 0x00ccff // Blue for 2 unhighlighted cells
+      const RED_COLOR = 0xff0000 // Red for 1 unhighlighted cell
 
-      // First highlight the selected cell's row and column
-      selectionElements.current.forEach(element => {
-        const [x, y] = ktoxy(element.k)
+      // Only highlight legal placement cells if the selected cell has a digit
+      if (selectedDigit) {
+        // Helper function to check if a cell can legally contain the selected digit
+        const canCellContainDigit = (cellK: number): boolean => {
+          // If cell already has a digit, it can't contain another
+          if (game.digits.get(cellK)) {
+            return false
+          }
 
-        // Skip the selected cell - it's already highlighted
-        if (element.k === selectedCellK) return
+          const [cx, cy] = ktoxy(cellK)
 
-        // Highlight cells in the same row or column as the selected cell
-        if (x === selectedX || y === selectedY) {
-          element.visible = true
-          element.graphics.alpha = ROW_COL_ALPHA
+          // Check if the cell is in the same row, column, or box as the selected cell
+          const inSameRow = cy === selectedY
+          const inSameCol = cx === selectedX
+          const inSameBox =
+            Math.floor(cx / 3) === Math.floor(selectedX / 3) &&
+            Math.floor(cy / 3) === Math.floor(selectedY / 3)
+
+          if (inSameRow || inSameCol || inSameBox) {
+            return false
+          }
+
+          // Check if cell is in same row/column as another instance of this digit
+          for (const [k, digit] of game.digits.entries()) {
+            if (k !== selectedCellK && digit.digit === selectedDigit.digit) {
+              const [dx, dy] = ktoxy(k)
+              if (cy === dy || cx === dx) {
+                return false
+              }
+
+              // Check if in same box as another instance of this digit
+              if (
+                Math.floor(cx / 3) === Math.floor(dx / 3) &&
+                Math.floor(cy / 3) === Math.floor(dy / 3)
+              ) {
+                return false
+              }
+            }
+          }
+
+          // If passed all constraints, the cell can contain this digit
+          return true
         }
-      })
 
-      // If a digit is selected, process related highlights
+        // Highlight all cells that CAN legally contain the selected digit
+        selectionElements.current.forEach(element => {
+          // Skip the selected cell - it's already highlighted
+          if (element.k === selectedCellK) return
+
+          if (canCellContainDigit(element.k)) {
+            element.visible = true
+            element.graphics.alpha = ROW_COL_ALPHA
+          }
+        })
+      }
+
+      // We've already handled all the highlighting in the canCellContainDigit function above
+      // We still need to collect the same digit cells for the special highlighting below
       if (selectedDigit) {
         // Find all cells with the same digit
         const sameDigitCells: { k: number; x: number; y: number }[] = []
@@ -1940,7 +2012,8 @@ const Grid = ({
             const [x, y] = ktoxy(k)
             sameDigitCells.push({ k, x, y })
 
-            // Highlight the digit itself (if it's not the selected cell)
+            // Highlight all instances of this digit with a special alpha
+            // to distinguish them from placement possibilities
             if (k !== selectedCellK) {
               const element = selectionElements.current.find(el => el.k === k)
               if (element) {
@@ -1950,28 +2023,145 @@ const Grid = ({
             }
           }
         })
+      }
 
-        // Now highlight all rows and columns that contain the same digit
-        selectionElements.current.forEach(element => {
-          const [x, y] = ktoxy(element.k)
+      // Special highlighting for 3x3 boxes with only two unhighlighted squares
+      if (selectedDigit) {
+        console.log(
+          `Starting special highlighting check for digit: ${selectedDigit.digit}`,
+        )
 
-          // Skip cells we've already processed (selected cell or same digit cells)
-          if (
-            element.k === selectedCellK ||
-            sameDigitCells.some(cell => cell.k === element.k)
-          ) {
-            return
+        // For each 3x3 box, check if it has only two unhighlighted cells
+        for (let boxRow = 0; boxRow < 3; boxRow++) {
+          for (let boxCol = 0; boxCol < 3; boxCol++) {
+            console.log(`Checking box at [${boxRow}, ${boxCol}]`)
+            const potentialCells: number[] = [] // Cells that can legally contain the digit
+            const allCellsInBox: number[] = []
+
+            // Check each cell in this 3x3 box
+            for (let cellY = boxRow * 3; cellY < boxRow * 3 + 3; cellY++) {
+              for (let cellX = boxCol * 3; cellX < boxCol * 3 + 3; cellX++) {
+                const cellK = xytok(cellX, cellY)
+                allCellsInBox.push(cellK)
+                const element = selectionElements.current.find(
+                  el => el.k === cellK,
+                )
+
+                console.log(
+                  `Cell [${cellX}, ${cellY}], k=${cellK}: visible=${element?.visible}, hasDigit=${Boolean(game.digits.get(cellK))}`,
+                )
+
+                // In our inverted approach, highlighted cells are those that CAN contain the digit
+                // For the special highlighting, we need to identify cells that:
+                // 1. Are empty (no digit)
+                // 2. CAN contain the selected digit (should be highlighted)
+                const canContainDigit =
+                  element && element.graphics && element.graphics.visible
+                const isEmpty = !game.digits.get(cellK)
+
+                // If cell CAN contain the digit and is empty, add to our list of potential cells
+                if (element && canContainDigit && isEmpty) {
+                  potentialCells.push(cellK)
+                  console.log(
+                    `  Added to potential cells (graphics.visible = ${element.graphics.visible})`,
+                  )
+                }
+              }
+            }
+
+            // Check if this 3x3 box already contains the selected digit
+            let boxContainsSelectedDigit = false
+            game.digits.forEach((digit, k) => {
+              if (digit.digit === selectedDigit.digit) {
+                const [x, y] = ktoxy(k)
+                if (
+                  Math.floor(x / 3) === boxCol &&
+                  Math.floor(y / 3) === boxRow
+                ) {
+                  boxContainsSelectedDigit = true
+                  console.log(
+                    `Box already contains the selected digit ${selectedDigit.digit} at [${x}, ${y}]`,
+                  )
+                }
+              }
+            })
+
+            console.log(
+              `Box [${boxRow}, ${boxCol}]: potential cells = ${potentialCells.length}, contains digit=${boxContainsSelectedDigit}`,
+            )
+
+            // Handle both cases: 1 or 2 potential cells (if box doesn't have the digit)
+            if (
+              !boxContainsSelectedDigit &&
+              (potentialCells.length === 1 || potentialCells.length === 2)
+            ) {
+              // Choose color based on count - red for 1, blue for 2
+              const highlightColor =
+                potentialCells.length === 1 ? RED_COLOR : BLUE_COLOR
+              const countLabel = potentialCells.length === 1 ? "one" : "two"
+
+              console.log(
+                `Found box with exactly ${countLabel} potential cells and no digit ${selectedDigit.digit}`,
+              )
+
+              // Create a container if it doesn't exist yet
+              let customHighlights = (window as any).customHighlights
+              if (!customHighlights) {
+                customHighlights = new Container()
+                customHighlights.zIndex = 1000 // Very high zIndex
+
+                // Add to the grid element for proper coordinate inheritance
+                gridElement.current?.addChild(customHighlights)
+                ;(window as any).customHighlights = customHighlights
+                console.log("Created new custom highlights container")
+              }
+
+              // Highlight each cell
+              potentialCells.forEach(cellK => {
+                const [x, y] = ktoxy(cellK)
+                console.log(
+                  `Highlighting special cell at [${x}, ${y}], k=${cellK}, color=${highlightColor.toString(16)}`,
+                )
+
+                const element = selectionElements.current.find(
+                  el => el.k === cellK,
+                )
+                if (element) {
+                  try {
+                    // Get the position from the existing element
+                    const cellGraphics = element.graphics
+
+                    // Create a completely standalone custom graphics for highlighting
+                    const specialHighlight = new Graphics()
+                    specialHighlight.beginFill(highlightColor, SPECIAL_ALPHA)
+                    specialHighlight.drawRect(
+                      0,
+                      0,
+                      cellSize * cellSizeFactor.current - 1,
+                      cellSize * cellSizeFactor.current - 1,
+                    )
+                    specialHighlight.endFill()
+
+                    // Position it using the same coordinates as the original cell
+                    specialHighlight.x = cellGraphics.x
+                    specialHighlight.y = cellGraphics.y
+
+                    // Add to special container
+                    customHighlights.addChild(specialHighlight)
+
+                    console.log(
+                      `  Added highlight at [${x}, ${y}], k=${cellK}, color=${highlightColor.toString(16)}`,
+                    )
+                  } catch (e) {
+                    console.error(`  Error adding special highlight: ${e}`)
+                  }
+                } else {
+                  console.error(`  Could not find element for cell k=${cellK}`)
+                }
+              })
+            }
           }
-
-          // Check if this cell is in a row or column that contains the digit
-          const inRowWithSameDigit = sameDigitCells.some(cell => cell.y === y)
-          const inColWithSameDigit = sameDigitCells.some(cell => cell.x === x)
-
-          if (inRowWithSameDigit || inColWithSameDigit) {
-            element.visible = true
-            element.graphics.alpha = ROW_COL_ALPHA
-          }
-        })
+        }
       }
     }
 

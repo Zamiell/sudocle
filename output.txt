@@ -1,0 +1,21 @@
+Unhandled Runtime Error
+
+ReferenceError: ACTION_ROTATE_BACKWARD is not defined
+
+Source
+components/hooks/useGame.tsx (355:60) @ ACTION_ROTATE_BACKWARD
+
+  353 |   }
+  354 |
+> 355 |   if (action.action === ACTION_ROTATE || action.action === ACTION_ROTATE_BACKWARD) {
+      |                                                            ^
+  356 |     // Forward rotation (clockwise)
+  357 |     if (action.action === ACTION_ROTATE) {
+  358 |       switch (newMode) {
+Call Stack
+modeReducer
+components/hooks/useGame.tsx (791:7)
+gameReducerNoUndo
+components/hooks/useGame.tsx (1154:11)
+eval
+node_modules/immer/dist/immer.mjs (558:1)

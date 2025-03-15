@@ -14,6 +14,7 @@ import {
   Action,
   ColoursAction,
   DigitsAction,
+  FillCenterMarksAction,
   ModeAction,
   ModeGroupAction,
   PenLinesAction,
@@ -21,6 +22,7 @@ import {
   TYPE_CHECK,
   TYPE_COLOURS,
   TYPE_DIGITS,
+  TYPE_FILL_CENTER_MARKS,
   TYPE_INIT,
   TYPE_MODE,
   TYPE_MODE_GROUP,
@@ -759,6 +761,73 @@ function gameReducerNoUndo(state: GameState, mode: string, action: Action) {
     case TYPE_MODE_GROUP:
       modeGroupReducer(state, action)
       return
+
+    case TYPE_FILL_CENTER_MARKS: {
+      // This is a special action type that fills center marks for multiple cells in one go
+
+      // First switch to center marks mode
+      state.mode = MODE_CENTRE
+
+      const cellsToProcess = (action as FillCenterMarksAction).cells
+
+      // For each cell to process
+      for (const cellK of cellsToProcess) {
+        // Skip cells that already have a digit
+        if (state.digits.get(cellK)) {
+          continue
+        }
+
+        const [x, y] = ktoxy(cellK)
+
+        // Find all digits 1-9 that are already present in the row, column, or 3x3 box
+        const usedDigits = new Set<number>()
+
+        // Check row
+        for (let col = 0; col < 9; col++) {
+          const k = xytok(col, y)
+          const digit = state.digits.get(k)
+          if (digit && typeof digit.digit === "number") {
+            usedDigits.add(digit.digit)
+          }
+        }
+
+        // Check column
+        for (let row = 0; row < 9; row++) {
+          const k = xytok(x, row)
+          const digit = state.digits.get(k)
+          if (digit && typeof digit.digit === "number") {
+            usedDigits.add(digit.digit)
+          }
+        }
+
+        // Check 3x3 box
+        const boxStartX = Math.floor(x / 3) * 3
+        const boxStartY = Math.floor(y / 3) * 3
+        for (let row = boxStartY; row < boxStartY + 3; row++) {
+          for (let col = boxStartX; col < boxStartX + 3; col++) {
+            const k = xytok(col, row)
+            const digit = state.digits.get(k)
+            if (digit && typeof digit.digit === "number") {
+              usedDigits.add(digit.digit)
+            }
+          }
+        }
+
+        // Add each available digit (1-9 that's not in usedDigits) as a center mark
+        for (let digit = 1; digit <= 9; digit++) {
+          if (!usedDigits.has(digit)) {
+            let digits = state.centreMarks.get(cellK)
+            if (digits === undefined) {
+              digits = new Set()
+              state.centreMarks.set(cellK, digits)
+            }
+            digits.add(digit)
+          }
+        }
+      }
+
+      return
+    }
 
     case TYPE_DIGITS: {
       let filteredDigits: Map<number, Digit>

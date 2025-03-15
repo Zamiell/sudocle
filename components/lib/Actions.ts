@@ -14,6 +14,7 @@ export const TYPE_REDO = "redo"
 export const TYPE_INIT = "init"
 export const TYPE_CHECK = "check"
 export const TYPE_PAUSE = "pause"
+export const TYPE_FILL_CENTER_MARKS = "fillCenterMarks"
 
 export const ACTION_ALL = "all"
 export const ACTION_SET = "set"
@@ -96,6 +97,11 @@ export interface PauseAction {
   readonly type: typeof TYPE_PAUSE
 }
 
+export interface FillCenterMarksAction {
+  readonly type: typeof TYPE_FILL_CENTER_MARKS
+  readonly cells: number[]
+}
+
 export type Action =
   | ModeAction
   | ModeGroupAction
@@ -108,3 +114,4 @@ export type Action =
   | InitAction
   | CheckAction
   | PauseAction
+  | FillCenterMarksAction

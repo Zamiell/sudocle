@@ -35,6 +35,7 @@ import {
 import { convertCTCPuzzle } from "../../components/lib/ctcpuzzleconverter"
 import { convertFPuzzle } from "../../components/lib/fpuzzlesconverter"
 import lzwDecompress from "../../components/lib/lzwdecompressor"
+import { ktoxy } from "../../components/lib/utils"
 import { Data } from "../../components/types/Data"
 import FontFaceObserver from "fontfaceobserver"
 import { enableMapSet } from "immer"
@@ -373,10 +374,61 @@ const IndexPage = () => {
         !shiftPressed &&
         !altPressed
       ) {
-        updateGame({
-          type: TYPE_MODE_GROUP,
-          action: ACTION_ROTATE,
-        })
+        // Get the current selection
+        const selection = game.selection
+
+        // Only proceed if exactly one cell is selected
+        if (selection.size === 1) {
+          const selectedCellK = [...selection][0]
+          const selectedDigit = game.digits.get(selectedCellK)
+
+          // Only proceed if the selected cell has a digit
+          if (selectedDigit && typeof selectedDigit.digit === "number") {
+            // Find the next digit (1-9, wrapping around from 9 to 1)
+            const currentDigit = selectedDigit.digit
+            const nextDigit = currentDigit === 9 ? 1 : currentDigit + 1
+
+            // Find all cells with the next digit
+            const nextDigitCells: {
+              k: number
+              x: number
+              y: number
+              distance: number
+            }[] = []
+            const [selectedX, selectedY] = ktoxy(selectedCellK)
+
+            // Search through all cells for the next digit
+            game.digits.forEach((digit, k) => {
+              if (
+                typeof digit.digit === "number" &&
+                digit.digit === nextDigit
+              ) {
+                const [x, y] = ktoxy(k)
+
+                // Calculate Euclidean distance from selected cell
+                const distance = Math.sqrt(
+                  Math.pow(x - selectedX, 2) + Math.pow(y - selectedY, 2),
+                )
+
+                nextDigitCells.push({ k, x, y, distance })
+              }
+            })
+
+            // If we found cells with the next digit, select the closest one
+            if (nextDigitCells.length > 0) {
+              // Sort by distance (closest first)
+              nextDigitCells.sort((a, b) => a.distance - b.distance)
+
+              // Select the closest cell
+              updateGame({
+                type: TYPE_SELECTION,
+                action: ACTION_SET,
+                k: nextDigitCells[0].k,
+              })
+            }
+          }
+        }
+
         e.preventDefault()
       } else if (e.key === "Meta" || e.key === "Control") {
         updateGame({
@@ -546,7 +598,7 @@ const IndexPage = () => {
       window.removeEventListener("keyup", onKeyUp)
       window.removeEventListener("keydown", onKeyDown)
     }
-  }, [updateGame])
+  }, [updateGame, game])
 
   // register resize handler
   useEffect(() => {
