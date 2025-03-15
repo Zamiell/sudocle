@@ -1,21 +1,19 @@
-Unhandled Runtime Error
+Build Error
+Next.js (15.0.2) out of date (learn more)
+Failed to compile
 
-ReferenceError: savedState is not defined
+./components/grid/Grid.tsx
+Error:   × Expression expected
+      ╭─[/Users/james/Repositories/sudocle/components/grid/Grid.tsx:2341:1]
+ 2338 │     }
+ 2339 │   
+ 2340 │     renderNow()
+ 2341 │   }, [game.selection, game.digits, game.cornerMarks, renderNow])
+      ·    ─
+ 2342 │ 
+ 2343 │   useEffect(() => {
+ 2344 │     if (app === undefined) {
+      ╰────
 
-Source
-components/hooks/useGame.tsx (1182:11) @ eval
-
-  1180 |           
-  1181 |           // If we have saved state for this puzzle, merge it in
-> 1182 |           if (savedState) {
-       |           ^
-  1183 |             return {
-  1184 |               ...baseState,
-  1185 |               digits: savedState.digits,
-Call Stack
-eval
-node_modules/immer/dist/immer.mjs (558:1)
-Immer2.produce
-node_modules/immer/dist/immer.mjs (571:1)
-curriedProduce
-node_modules/immer/dist/immer.mjs (558:1)
+Caused by:
+    Syntax Error
