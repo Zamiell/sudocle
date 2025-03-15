@@ -357,10 +357,6 @@ const IndexPage = () => {
 
   // register keyboard handlers
   useEffect(() => {
-    let metaPressed = false
-    let shiftPressed = false
-    let altPressed = false
-
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === " ") {
         updateGame({
@@ -368,7 +364,7 @@ const IndexPage = () => {
           action: ACTION_ROTATE,
         })
         e.preventDefault()
-      } else if (e.key === "Tab" && !metaPressed && !altPressed) {
+      } else if (e.key === "Tab") {
         // Get the current selection
         const selection = game.selection
 
@@ -394,6 +390,28 @@ const IndexPage = () => {
               // Find the previous digit (9-1, wrapping around from 1 to 9)
               targetDigit =
                 selectedDigit.digit === 1 ? 9 : selectedDigit.digit - 1
+            }
+          }
+          
+          // Function to count how many instances of a digit exist
+          const countDigitInstances = (digit: number): number => {
+            let count = 0
+            game.digits.forEach((d) => {
+              if (typeof d.digit === "number" && d.digit === digit) {
+                count++
+              }
+            })
+            return count
+          }
+          
+          // Skip digits that already have 9 instances filled in
+          let skippedDigits = 0
+          while (countDigitInstances(targetDigit) >= 9 && skippedDigits < 9) {
+            skippedDigits++
+            if (goingForward) {
+              targetDigit = targetDigit === 9 ? 1 : targetDigit + 1
+            } else {
+              targetDigit = targetDigit === 1 ? 9 : targetDigit - 1
             }
           }
 
@@ -437,30 +455,7 @@ const IndexPage = () => {
         }
 
         e.preventDefault()
-      } else if (e.key === "Meta" || e.key === "Control") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_PUSH,
-          mode: MODE_CENTRE,
-        })
-        metaPressed = true
-        e.preventDefault()
-      } else if (e.key === "Shift") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_PUSH,
-          mode: MODE_CORNER,
-        })
-        shiftPressed = true
-        e.preventDefault()
-      } else if (e.key === "Alt") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_PUSH,
-          mode: MODE_COLOUR,
-        })
-        altPressed = true
-        e.preventDefault()
+      // Removed Meta/Control, Shift, and Alt key handlers for temporary mode switching
       } else if ((e.key === "z" || e.key === "Z") && (e.metaKey || e.ctrlKey)) {
         updateGame({
           type: e.shiftKey ? TYPE_REDO : TYPE_UNDO,
@@ -544,64 +539,18 @@ const IndexPage = () => {
     }
 
     function onKeyUp(e: KeyboardEvent) {
-      if (e.key === "Meta" || e.key === "Control") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_CENTRE,
-        })
-        metaPressed = false
-        e.preventDefault()
-      } else if (e.key === "Shift") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_CORNER,
-        })
-        shiftPressed = false
-        e.preventDefault()
-      } else if (e.key === "Alt") {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_COLOUR,
-        })
-        altPressed = false
-        e.preventDefault()
-      }
+      // Removed Meta/Control, Shift, and Alt key handlers for temporary mode switching
     }
 
     function onBlur() {
-      if (metaPressed) {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_CENTRE,
-        })
-        metaPressed = false
-      } else if (shiftPressed) {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_CORNER,
-        })
-        shiftPressed = false
-      } else if (altPressed) {
-        updateGame({
-          type: TYPE_MODE,
-          action: ACTION_REMOVE,
-          mode: MODE_COLOUR,
-        })
-        altPressed = false
-      }
+      // Removed Meta/Control, Shift, and Alt key handlers for temporary mode switching
     }
 
     window.addEventListener("keydown", onKeyDown)
+    // Keep keyup listener for potential future use
     window.addEventListener("keyup", onKeyUp)
-    window.addEventListener("blur", onBlur)
 
     return () => {
-      window.removeEventListener("blur", onBlur)
       window.removeEventListener("keyup", onKeyUp)
       window.removeEventListener("keydown", onKeyDown)
     }
