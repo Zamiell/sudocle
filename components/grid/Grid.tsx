@@ -1893,11 +1893,90 @@ const Grid = ({
   ])
 
   useEffect(() => {
+    // First, clear all selection highlights and reset alpha
     selectionElements.current.forEach(s => {
-      s.visible = game.selection.has(s.k)
+      s.visible = false
+      s.graphics.alpha = 0.5 // Reset to default alpha
     })
+
+    // Set highlights for selected cells
+    selectionElements.current.forEach(s => {
+      if (game.selection.has(s.k)) {
+        s.visible = true
+      }
+    })
+
+    // If we have a selection with only one cell, highlight related cells
+    if (game.selection.size === 1) {
+      const selectedCellK = [...game.selection][0]
+      const selectedDigit = game.digits.get(selectedCellK)
+      const [selectedX, selectedY] = ktoxy(selectedCellK)
+
+      // Three types of highlighting with different alpha levels:
+      const SAME_DIGIT_ALPHA = 0.2 // Same digit value
+      const ROW_COL_ALPHA = 0.2 // Same row or column
+
+      // First highlight the selected cell's row and column
+      selectionElements.current.forEach(element => {
+        const [x, y] = ktoxy(element.k)
+
+        // Skip the selected cell - it's already highlighted
+        if (element.k === selectedCellK) return
+
+        // Highlight cells in the same row or column as the selected cell
+        if (x === selectedX || y === selectedY) {
+          element.visible = true
+          element.graphics.alpha = ROW_COL_ALPHA
+        }
+      })
+
+      // If a digit is selected, process related highlights
+      if (selectedDigit) {
+        // Find all cells with the same digit
+        const sameDigitCells: { k: number; x: number; y: number }[] = []
+
+        game.digits.forEach((digit, k) => {
+          if (digit.digit === selectedDigit.digit) {
+            const [x, y] = ktoxy(k)
+            sameDigitCells.push({ k, x, y })
+
+            // Highlight the digit itself (if it's not the selected cell)
+            if (k !== selectedCellK) {
+              const element = selectionElements.current.find(el => el.k === k)
+              if (element) {
+                element.visible = true
+                element.graphics.alpha = SAME_DIGIT_ALPHA
+              }
+            }
+          }
+        })
+
+        // Now highlight all rows and columns that contain the same digit
+        selectionElements.current.forEach(element => {
+          const [x, y] = ktoxy(element.k)
+
+          // Skip cells we've already processed (selected cell or same digit cells)
+          if (
+            element.k === selectedCellK ||
+            sameDigitCells.some(cell => cell.k === element.k)
+          ) {
+            return
+          }
+
+          // Check if this cell is in a row or column that contains the digit
+          const inRowWithSameDigit = sameDigitCells.some(cell => cell.y === y)
+          const inColWithSameDigit = sameDigitCells.some(cell => cell.x === x)
+
+          if (inRowWithSameDigit || inColWithSameDigit) {
+            element.visible = true
+            element.graphics.alpha = ROW_COL_ALPHA
+          }
+        })
+      }
+    }
+
     renderNow()
-  }, [game.selection, renderNow])
+  }, [game.selection, game.digits, renderNow])
 
   useEffect(() => {
     if (app === undefined) {
