@@ -398,7 +398,11 @@ function marksReducer(
   marks: Map<number, Set<string | number>>,
   action: DigitsAction,
   selection: Set<number>,
+  isCornerMarks = false,
+  state?: GameState
 ) {
+  let changed = false;
+  
   switch (action.action) {
     case ACTION_SET: {
       if (action.digit !== undefined) {
@@ -412,6 +416,7 @@ function marksReducer(
             digits.delete(action.digit)
           } else {
             digits.add(action.digit)
+            changed = true;
           }
           if (digits.size === 0) {
             marks.delete(sc)
@@ -423,11 +428,125 @@ function marksReducer(
 
     case ACTION_REMOVE: {
       for (let sc of selection) {
-        marks.delete(sc)
+        if (marks.has(sc)) {
+          changed = true;
+          marks.delete(sc)
+        }
       }
       break
     }
   }
+  
+  // If this is for corner marks and we have state, check for naked pairs
+  if (isCornerMarks && changed && state) {
+    // This function handles finding and checking naked pairs in corner marks
+    const convertCornerMarkNakedPairs = (state: GameState) => {
+      console.log(`Checking for corner mark naked pairs after update`);
+      
+      // Helper function to identify naked pairs 
+      const findNakedPairs = (regionCells: number[], marksMap: Map<number, Set<number | string>>) => {
+        // Map to track cells by their exact marks content
+        const cellsByMarks = new Map<string, number[]>()
+        
+        // Find all cells with exactly 2 marks
+        for (const cellK of regionCells) {
+          // Skip cells with digits
+          if (state.digits.get(cellK)) continue
+          
+          const marks = marksMap.get(cellK)
+          if (marks && marks.size === 2) {
+            // Create a key from the sorted marks
+            const marksArray = Array.from(marks).map(m => m.toString()).sort()
+            const marksKey = marksArray.join(',')
+            
+            // Add cell to the appropriate group
+            if (!cellsByMarks.has(marksKey)) {
+              cellsByMarks.set(marksKey, [])
+            }
+            cellsByMarks.get(marksKey)!.push(cellK)
+          }
+        }
+        
+        // Find pairs (exactly 2 cells with the same marks)
+        const nakedPairs: { cells: number[], digits: (string | number)[] }[] = []
+        
+        cellsByMarks.forEach((cells, marksKey) => {
+          if (cells.length === 2) {
+            const marks = marksKey.split(',').map(d => {
+              // Handle both string and number conversions
+              return isNaN(Number(d)) ? d : Number(d)
+            })
+            nakedPairs.push({ cells, digits: marks })
+          }
+        })
+        
+        return nakedPairs
+      }
+      
+      // Helper function to convert corner mark naked pairs to center marks
+      const convertPairToCenter = (pair: { cells: number[], digits: (string | number)[] }) => {
+        console.log(`Converting naked pair with digits [${pair.digits.join(',')}]`);
+        
+        // For each cell in the pair
+        pair.cells.forEach(cellK => {
+          // Get corner marks (should exist and have exactly 2 digits)
+          const cornerMarks = state.cornerMarks.get(cellK)
+          if (!cornerMarks || cornerMarks.size !== 2) return
+          
+          // Create center marks for the same digits if they don't exist
+          let centerMarks = state.centreMarks.get(cellK)
+          if (!centerMarks) {
+            centerMarks = new Set<string | number>()
+            state.centreMarks.set(cellK, centerMarks)
+          }
+          
+          // Transfer all digits from corner marks to center marks
+          cornerMarks.forEach(digit => {
+            centerMarks!.add(digit)
+          })
+          
+          // Remove the corner marks
+          state.cornerMarks.delete(cellK)
+        })
+      }
+      
+      // Process all rows, columns and boxes
+      
+      // Process rows
+      for (let row = 0; row < 9; row++) {
+        const rowCells = Array.from({ length: 9 }, (_, col) => xytok(col, row))
+        const nakedPairs = findNakedPairs(rowCells, state.cornerMarks)
+        nakedPairs.forEach(convertPairToCenter)
+      }
+      
+      // Process columns
+      for (let col = 0; col < 9; col++) {
+        const colCells = Array.from({ length: 9 }, (_, row) => xytok(col, row))
+        const nakedPairs = findNakedPairs(colCells, state.cornerMarks)
+        nakedPairs.forEach(convertPairToCenter)
+      }
+      
+      // Process boxes
+      for (let boxRow = 0; boxRow < 3; boxRow++) {
+        for (let boxCol = 0; boxCol < 3; boxCol++) {
+          const boxCells: number[] = []
+          for (let row = boxRow * 3; row < boxRow * 3 + 3; row++) {
+            for (let col = boxCol * 3; col < boxCol * 3 + 3; col++) {
+              boxCells.push(xytok(col, row))
+            }
+          }
+          
+          const nakedPairs = findNakedPairs(boxCells, state.cornerMarks)
+          nakedPairs.forEach(convertPairToCenter)
+        }
+      }
+    }
+    
+    // Run the conversion
+    convertCornerMarkNakedPairs(state);
+  }
+  
+  return changed;
 }
 
 function digitsReducer(
@@ -917,6 +1036,8 @@ function gameReducerNoUndo(state: GameState, mode: string, action: Action) {
             state.cornerMarks,
             action,
             filterGivens(filteredDigits, state.selection),
+            true,  // This is corner marks
+            state  // Pass state for naked pair detection
           )
           return
         case MODE_CENTRE:
@@ -924,6 +1045,8 @@ function gameReducerNoUndo(state: GameState, mode: string, action: Action) {
             state.centreMarks,
             action,
             filterGivens(filteredDigits, state.selection),
+            false, // This is not corner marks
+            state  // Pass state for consistency
           )
           return
       }
