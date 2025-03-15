@@ -230,6 +230,81 @@ const Settings = () => {
           valueToDescription={fontSizeValueToDescription}
         />
       </Slider>
+      
+      <h3>Saved Progress</h3>
+      <div className="mb-4">
+        <button
+          className="bg-fg-400 hover:bg-fg-500 text-bg-100 font-semibold py-2 px-4 rounded"
+          onClick={() => {
+            // Get the current puzzle ID using similar logic to the useGame hook
+            let id = window.location.pathname;
+            
+            // Process the path
+            if (id.endsWith('/')) {
+              id = id.substring(0, id.length - 1);
+            }
+            if (id.startsWith('/')) {
+              id = id.substring(1);
+            }
+            
+            // Extract the last part of the path as the puzzle ID
+            const pathParts = id.split('/');
+            const currentPuzzleId = pathParts.length > 0 ? pathParts[pathParts.length - 1] : '';
+            
+            // Check URL params if path is empty
+            let puzzleId = currentPuzzleId;
+            if (!puzzleId) {
+              const params = new URLSearchParams(window.location.search);
+              const paramId = params.get('puzzleid');
+              const fpuzzlesId = params.get('fpuzzles');
+              const fpuz = params.get('fpuz');
+              const ctcId = params.get('ctc');
+              const sclId = params.get('scl');
+              
+              if (fpuzzlesId) puzzleId = 'fpuzzles' + fpuzzlesId;
+              else if (fpuz) puzzleId = 'fpuz' + fpuz;
+              else if (ctcId) puzzleId = 'ctc' + ctcId;
+              else if (sclId) puzzleId = 'scl' + sclId;
+              else if (paramId) puzzleId = paramId;
+              else if (params.get('test')) puzzleId = 'test';
+            }
+            
+            if (puzzleId) {
+              localStorage.removeItem('sudocle_game_' + puzzleId);
+              alert('Progress for current puzzle cleared.');
+              // Reload the page to reset the game
+              window.location.reload();
+            } else {
+              alert('No puzzle detected.');
+            }
+          }}
+        >
+          Clear Current Puzzle Progress
+        </button>
+      </div>
+      <div className="mb-4">
+        <button
+          className="bg-alert hover:bg-alert-600 text-bg-100 font-semibold py-2 px-4 rounded"
+          onClick={() => {
+            if (confirm('Are you sure you want to clear ALL saved puzzle progress? This cannot be undone.')) {
+              // Clear all puzzle progress
+              const keysToRemove = [];
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('sudocle_game_')) {
+                  keysToRemove.push(key);
+                }
+              }
+              keysToRemove.forEach(key => localStorage.removeItem(key));
+              alert('All puzzle progress cleared.');
+              // Reload the page to reset the game
+              window.location.reload();
+            }
+          }}
+        >
+          Clear ALL Saved Progress
+        </button>
+      </div>
     </div>
   )
 }

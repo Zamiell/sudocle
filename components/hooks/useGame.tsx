@@ -907,12 +907,154 @@ function makeUndoState(state: PersistentGameState): PersistentGameState {
   }
 }
 
+// Helper functions for serializing/deserializing game state
+const STORAGE_KEY_PREFIX = 'sudocle_game_'
+
+// Convert Maps and Sets to arrays for JSON serialization
+function serializeGameState(state: PersistentGameState, puzzleId: string): string {
+  // Create a serializable version of the state
+  const serialized = {
+    digits: Array.from(state.digits.entries()),
+    cornerMarks: Array.from(state.cornerMarks.entries()).map(([k, v]) => [k, Array.from(v)]),
+    centreMarks: Array.from(state.centreMarks.entries()).map(([k, v]) => [k, Array.from(v)]),
+    colours: Array.from(state.colours.entries()),
+    penLines: Array.from(state.penLines),
+    fogLights: state.fogLights,
+    fogRaster: state.fogRaster,
+    puzzleId
+  }
+  
+  return JSON.stringify(serialized)
+}
+
+// Convert arrays back to Maps and Sets when deserializing
+function deserializeGameState(json: string): [PersistentGameState, string] {
+  try {
+    const parsed = JSON.parse(json)
+    
+    // Extract the puzzle ID
+    const puzzleId = parsed.puzzleId || ''
+    
+    // Recreate the state with proper Maps and Sets
+    const state: PersistentGameState = {
+      digits: new Map(parsed.digits),
+      cornerMarks: new Map(parsed.cornerMarks.map(([k, v]: [number, Array<number | string>]) => 
+        [k, new Set(v)]
+      )),
+      centreMarks: new Map(parsed.centreMarks.map(([k, v]: [number, Array<number | string>]) => 
+        [k, new Set(v)]
+      )),
+      colours: new Map(parsed.colours),
+      penLines: new Set(parsed.penLines),
+      fogLights: parsed.fogLights,
+      fogRaster: parsed.fogRaster
+    }
+    
+    return [state, puzzleId]
+  } catch (e) {
+    console.error('Failed to deserialize game state:', e)
+    return [
+      {
+        digits: new Map(),
+        cornerMarks: new Map(),
+        centreMarks: new Map(),
+        colours: new Map(),
+        penLines: new Set()
+      },
+      ''
+    ]
+  }
+}
+
+// Get the current puzzle ID from the URL
+function getCurrentPuzzleId(): string {
+  if (typeof window === 'undefined') return ''
+  
+  let id = window.location.pathname
+  
+  // Process the path
+  if (process.env.__NEXT_ROUTER_BASEPATH) {
+    id = id.substring(process.env.__NEXT_ROUTER_BASEPATH.length)
+  }
+  if (id.endsWith('/')) {
+    id = id.substring(0, id.length - 1)
+  }
+  if (id.startsWith('/')) {
+    id = id.substring(1)
+  }
+  
+  // Extract the last part of the path as the puzzle ID
+  const pathParts = id.split('/')
+  id = pathParts.length > 0 ? pathParts[pathParts.length - 1] : ''
+  
+  // Check URL params if path is empty
+  if (!id) {
+    const params = new URLSearchParams(window.location.search)
+    const puzzleId = params.get('puzzleid')
+    const fpuzzlesId = params.get('fpuzzles')
+    const fpuz = params.get('fpuz')
+    const ctcId = params.get('ctc')
+    const sclId = params.get('scl')
+    
+    if (fpuzzlesId) return 'fpuzzles' + fpuzzlesId
+    if (fpuz) return 'fpuz' + fpuz
+    if (ctcId) return 'ctc' + ctcId
+    if (sclId) return 'scl' + sclId
+    if (puzzleId) return puzzleId
+    
+    const testId = params.get('test')
+    if (testId) return 'test'
+  }
+  
+  return id
+}
+
+// Save game state to localStorage
+function saveGameState(state: GameState) {
+  if (typeof window === 'undefined') return
+  
+  const puzzleId = getCurrentPuzzleId()
+  if (!puzzleId || !state.data || state.data.cells.length === 0) return
+  
+  try {
+    const serialized = serializeGameState(state, puzzleId)
+    localStorage.setItem(STORAGE_KEY_PREFIX + puzzleId, serialized)
+  } catch (e) {
+    console.error('Failed to save game state:', e)
+  }
+}
+
+// Load game state from localStorage
+function loadGameState(puzzleId: string): PersistentGameState | null {
+  if (typeof window === 'undefined' || !puzzleId) return null
+  
+  try {
+    const json = localStorage.getItem(STORAGE_KEY_PREFIX + puzzleId)
+    if (!json) return null
+    
+    const [state, storedPuzzleId] = deserializeGameState(json)
+    
+    // Only restore if the stored puzzle ID matches
+    if (storedPuzzleId === puzzleId) {
+      return state
+    }
+    return null
+  } catch (e) {
+    console.error('Failed to load game state:', e)
+    return null
+  }
+}
+
 export const useGame = create<GameStateWithActions>()(
   immer((set, get) => ({
     ...makeEmptyState(),
 
     updateGame: (action: Action) =>
       set(draft => {
+        // After each action, save the game state
+        setTimeout(() => {
+          saveGameState(get())
+        }, 0)
         if (action.type === TYPE_INIT) {
           let canonicalData:
             | {
@@ -1029,7 +1171,28 @@ export const useGame = create<GameStateWithActions>()(
             }
           }
 
-          return makeEmptyState(canonicalData)
+          // Create the base state from the puzzle data
+          const baseState = makeEmptyState(canonicalData)
+          
+          // Try to load saved state for this puzzle
+          const puzzleId = getCurrentPuzzleId()
+          const savedState = loadGameState(puzzleId)
+          
+          // If we have saved state for this puzzle, merge it in
+          if (savedState) {
+            return {
+              ...baseState,
+              digits: savedState.digits,
+              cornerMarks: savedState.cornerMarks,
+              centreMarks: savedState.centreMarks,
+              colours: savedState.colours,
+              penLines: savedState.penLines,
+              fogLights: savedState.fogLights || baseState.fogLights,
+              fogRaster: savedState.fogRaster || baseState.fogRaster
+            }
+          }
+          
+          return baseState
         }
 
         if (action.type !== TYPE_PAUSE && draft.paused) {

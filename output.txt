@@ -1,21 +1,21 @@
 Unhandled Runtime Error
 
-ReferenceError: ACTION_ROTATE_BACKWARD is not defined
+ReferenceError: savedState is not defined
 
 Source
-components/hooks/useGame.tsx (355:60) @ ACTION_ROTATE_BACKWARD
+components/hooks/useGame.tsx (1182:11) @ eval
 
-  353 |   }
-  354 |
-> 355 |   if (action.action === ACTION_ROTATE || action.action === ACTION_ROTATE_BACKWARD) {
-      |                                                            ^
-  356 |     // Forward rotation (clockwise)
-  357 |     if (action.action === ACTION_ROTATE) {
-  358 |       switch (newMode) {
+  1180 |           
+  1181 |           // If we have saved state for this puzzle, merge it in
+> 1182 |           if (savedState) {
+       |           ^
+  1183 |             return {
+  1184 |               ...baseState,
+  1185 |               digits: savedState.digits,
 Call Stack
-modeReducer
-components/hooks/useGame.tsx (791:7)
-gameReducerNoUndo
-components/hooks/useGame.tsx (1154:11)
 eval
+node_modules/immer/dist/immer.mjs (558:1)
+Immer2.produce
+node_modules/immer/dist/immer.mjs (571:1)
+curriedProduce
 node_modules/immer/dist/immer.mjs (558:1)
