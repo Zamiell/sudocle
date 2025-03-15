@@ -2082,7 +2082,11 @@ const Grid = ({
 
                 // Check if this cell has corner marks matching the selected digit
                 const cornerMarks = game.cornerMarks.get(cellK)
-                if (cornerMarks && cornerMarks.has(selectedDigit.digit) && isEmpty) {
+                if (
+                  cornerMarks &&
+                  cornerMarks.has(selectedDigit.digit) &&
+                  isEmpty
+                ) {
                   cornerMarkCells.push(cellK)
                   console.log(
                     `  Cell has corner mark matching ${selectedDigit.digit}`,
@@ -2170,14 +2174,14 @@ const Grid = ({
                 }
               })
             }
-            
+
             // Check if exactly two cells in this box have corner marks matching the selected digit
             // and the box doesn't already contain the digit
             if (!boxContainsSelectedDigit && cornerMarkCells.length === 2) {
               console.log(
                 `Found box with exactly two cells containing corner mark ${selectedDigit.digit}`,
               )
-              
+
               // Highlight each cell with corner marks in blue
               cornerMarkCells.forEach(cellK => {
                 const [x, y] = ktoxy(cellK)

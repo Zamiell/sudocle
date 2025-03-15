@@ -368,12 +368,7 @@ const IndexPage = () => {
           action: ACTION_ROTATE,
         })
         e.preventDefault()
-      } else if (
-        e.key === "Tab" &&
-        !metaPressed &&
-        !shiftPressed &&
-        !altPressed
-      ) {
+      } else if (e.key === "Tab" && !metaPressed && !altPressed) {
         // Get the current selection
         const selection = game.selection
 
@@ -383,12 +378,23 @@ const IndexPage = () => {
           const selectedDigit = game.digits.get(selectedCellK)
           const [selectedX, selectedY] = ktoxy(selectedCellK)
 
-          // If the selected cell has a digit, find cells with the next digit (1-9)
-          // If the selected cell is empty, find the closest cell with digit 1
-          let targetDigit = 1
+          // Check if Shift is held to determine direction
+          const goingForward = !e.shiftKey
+
+          // If the selected cell has a digit, find cells with the next/previous digit
+          // If the selected cell is empty, find the closest cell with digit 1 (forward) or 9 (backward)
+          let targetDigit = goingForward ? 1 : 9
+
           if (selectedDigit && typeof selectedDigit.digit === "number") {
-            // Find the next digit (1-9, wrapping around from 9 to 1)
-            targetDigit = selectedDigit.digit === 9 ? 1 : selectedDigit.digit + 1
+            if (goingForward) {
+              // Find the next digit (1-9, wrapping around from 9 to 1)
+              targetDigit =
+                selectedDigit.digit === 9 ? 1 : selectedDigit.digit + 1
+            } else {
+              // Find the previous digit (9-1, wrapping around from 1 to 9)
+              targetDigit =
+                selectedDigit.digit === 1 ? 9 : selectedDigit.digit - 1
+            }
           }
 
           // Find all cells with the target digit
