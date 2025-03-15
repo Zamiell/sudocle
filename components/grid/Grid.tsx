@@ -1939,8 +1939,7 @@ const Grid = ({
       const [selectedX, selectedY] = ktoxy(selectedCellK)
 
       // Types of highlighting with different alpha levels:
-      const SAME_DIGIT_ALPHA = 0.2 // Same digit value
-      const ROW_COL_ALPHA = 0.2 // Same row or column
+      const ROW_COL_ALPHA = 0.15 // Same row or column
       const SPECIAL_ALPHA = 0.5 // Special cells (higher alpha for visibility)
       const BLUE_COLOR = 0x00ccff // Blue for 2 unhighlighted cells
       const RED_COLOR = 0xff0000 // Red for 1 unhighlighted cell
@@ -2001,26 +2000,16 @@ const Grid = ({
         })
       }
 
-      // We've already handled all the highlighting in the canCellContainDigit function above
       // We still need to collect the same digit cells for the special highlighting below
       if (selectedDigit) {
-        // Find all cells with the same digit
+        // Find all cells with the same digit (but don't highlight them)
         const sameDigitCells: { k: number; x: number; y: number }[] = []
 
         game.digits.forEach((digit, k) => {
           if (digit.digit === selectedDigit.digit) {
             const [x, y] = ktoxy(k)
             sameDigitCells.push({ k, x, y })
-
-            // Highlight all instances of this digit with a special alpha
-            // to distinguish them from placement possibilities
-            if (k !== selectedCellK) {
-              const element = selectionElements.current.find(el => el.k === k)
-              if (element) {
-                element.visible = true
-                element.graphics.alpha = SAME_DIGIT_ALPHA
-              }
-            }
+            // We no longer highlight other cells with the same digit
           }
         })
       }
