@@ -2031,11 +2031,24 @@ const Grid = ({
           `Starting special highlighting check for digit: ${selectedDigit.digit}`,
         )
 
+        // Create a container if it doesn't exist yet
+        let customHighlights = (window as any).customHighlights
+        if (!customHighlights) {
+          customHighlights = new Container()
+          customHighlights.zIndex = 1000 // Very high zIndex
+
+          // Add to the grid element for proper coordinate inheritance
+          gridElement.current?.addChild(customHighlights)
+          ;(window as any).customHighlights = customHighlights
+          console.log("Created new custom highlights container")
+        }
+
         // For each 3x3 box, check if it has only two unhighlighted cells
         for (let boxRow = 0; boxRow < 3; boxRow++) {
           for (let boxCol = 0; boxCol < 3; boxCol++) {
             console.log(`Checking box at [${boxRow}, ${boxCol}]`)
             const potentialCells: number[] = [] // Cells that can legally contain the digit
+            const cornerMarkCells: number[] = [] // Cells with corner marks matching the selected digit
             const allCellsInBox: number[] = []
 
             // Check each cell in this 3x3 box
@@ -2066,6 +2079,15 @@ const Grid = ({
                     `  Added to potential cells (graphics.visible = ${element.graphics.visible})`,
                   )
                 }
+
+                // Check if this cell has corner marks matching the selected digit
+                const cornerMarks = game.cornerMarks.get(cellK)
+                if (cornerMarks && cornerMarks.has(selectedDigit.digit) && isEmpty) {
+                  cornerMarkCells.push(cellK)
+                  console.log(
+                    `  Cell has corner mark matching ${selectedDigit.digit}`,
+                  )
+                }
               }
             }
 
@@ -2087,7 +2109,7 @@ const Grid = ({
             })
 
             console.log(
-              `Box [${boxRow}, ${boxCol}]: potential cells = ${potentialCells.length}, contains digit=${boxContainsSelectedDigit}`,
+              `Box [${boxRow}, ${boxCol}]: potential cells = ${potentialCells.length}, corner mark cells = ${cornerMarkCells.length}, contains digit=${boxContainsSelectedDigit}`,
             )
 
             // Handle both cases: 1 or 2 potential cells (if box doesn't have the digit)
@@ -2103,18 +2125,6 @@ const Grid = ({
               console.log(
                 `Found box with exactly ${countLabel} potential cells and no digit ${selectedDigit.digit}`,
               )
-
-              // Create a container if it doesn't exist yet
-              let customHighlights = (window as any).customHighlights
-              if (!customHighlights) {
-                customHighlights = new Container()
-                customHighlights.zIndex = 1000 // Very high zIndex
-
-                // Add to the grid element for proper coordinate inheritance
-                gridElement.current?.addChild(customHighlights)
-                ;(window as any).customHighlights = customHighlights
-                console.log("Created new custom highlights container")
-              }
 
               // Highlight each cell
               potentialCells.forEach(cellK => {
@@ -2160,13 +2170,65 @@ const Grid = ({
                 }
               })
             }
+            
+            // Check if exactly two cells in this box have corner marks matching the selected digit
+            // and the box doesn't already contain the digit
+            if (!boxContainsSelectedDigit && cornerMarkCells.length === 2) {
+              console.log(
+                `Found box with exactly two cells containing corner mark ${selectedDigit.digit}`,
+              )
+              
+              // Highlight each cell with corner marks in blue
+              cornerMarkCells.forEach(cellK => {
+                const [x, y] = ktoxy(cellK)
+                console.log(
+                  `Highlighting corner mark cell at [${x}, ${y}], k=${cellK}, color=${BLUE_COLOR.toString(16)}`,
+                )
+
+                const element = selectionElements.current.find(
+                  el => el.k === cellK,
+                )
+                if (element) {
+                  try {
+                    // Get the position from the existing element
+                    const cellGraphics = element.graphics
+
+                    // Create a completely standalone custom graphics for highlighting
+                    const specialHighlight = new Graphics()
+                    specialHighlight.beginFill(BLUE_COLOR, SPECIAL_ALPHA)
+                    specialHighlight.drawRect(
+                      0,
+                      0,
+                      cellSize * cellSizeFactor.current - 1,
+                      cellSize * cellSizeFactor.current - 1,
+                    )
+                    specialHighlight.endFill()
+
+                    // Position it using the same coordinates as the original cell
+                    specialHighlight.x = cellGraphics.x
+                    specialHighlight.y = cellGraphics.y
+
+                    // Add to special container
+                    customHighlights.addChild(specialHighlight)
+
+                    console.log(
+                      `  Added corner mark highlight at [${x}, ${y}], k=${cellK}, color=${BLUE_COLOR.toString(16)}`,
+                    )
+                  } catch (e) {
+                    console.error(`  Error adding special highlight: ${e}`)
+                  }
+                } else {
+                  console.error(`  Could not find element for cell k=${cellK}`)
+                }
+              })
+            }
           }
         }
       }
     }
 
     renderNow()
-  }, [game.selection, game.digits, renderNow])
+  }, [game.selection, game.digits, game.cornerMarks, renderNow])
 
   useEffect(() => {
     if (app === undefined) {
