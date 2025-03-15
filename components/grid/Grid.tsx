@@ -2246,55 +2246,74 @@ const Grid = ({
               }
             }
             
-            // NEW FEATURE: Check for naked pairs in center markings
-            // Get all cells with center marks in this box
-            const centreMarkCells: number[] = []
-            for (let cellY = boxRow * 3; cellY < boxRow * 3 + 3; cellY++) {
-              for (let cellX = boxCol * 3; cellX < boxCol * 3 + 3; cellX++) {
-                const cellK = xytok(cellX, cellY)
-                // Check if empty cell with center marks
-                if (!game.digits.get(cellK) && game.centreMarks.get(cellK)) {
-                  centreMarkCells.push(cellK)
+            // NEW FEATURE: Check for naked pairs in center markings that include the selected digit
+            // Only proceed if we have a selected digit
+            if (selectedDigit) {
+              // Get all cells with center marks in this box
+              const centreMarkCells: number[] = []
+              for (let cellY = boxRow * 3; cellY < boxRow * 3 + 3; cellY++) {
+                for (let cellX = boxCol * 3; cellX < boxCol * 3 + 3; cellX++) {
+                  const cellK = xytok(cellX, cellY)
+                  // Check if empty cell with center marks
+                  const centerMarks = game.centreMarks.get(cellK)
+                  if (!game.digits.get(cellK) && centerMarks) {
+                    // Only include cells that have the selected digit as a center mark
+                    if (centerMarks.has(selectedDigit.digit)) {
+                      centreMarkCells.push(cellK)
+                    }
+                  }
                 }
               }
-            }
-            
-            // Now check for naked pairs (cells with exactly the same 2 center marks)
-            if (centreMarkCells.length >= 2) {
-              console.log(`Checking ${centreMarkCells.length} cells with center marks for naked pairs`)
               
-              // Group cells by their center mark content (as a sorted string)
-              const cellsByCentreMarks = new Map<string, number[]>()
-              centreMarkCells.forEach(cellK => {
-                const marks = game.centreMarks.get(cellK)
-                if (marks && marks.size === 2) { // Only interested in cells with exactly 2 center marks
-                  const marksArray = Array.from(marks).sort()
-                  const marksKey = marksArray.join(',')
-                  
-                  if (!cellsByCentreMarks.has(marksKey)) {
-                    cellsByCentreMarks.set(marksKey, [])
-                  }
-                  cellsByCentreMarks.get(marksKey)!.push(cellK)
-                  console.log(`Cell ${cellK} has center marks: ${marksArray}, key: ${marksKey}`)
-                }
-              })
-              
-              // Check each group for pairs
-              cellsByCentreMarks.forEach((cells, marksKey) => {
-                if (cells.length === 2) {
-                  console.log(`Found naked pair with digits [${marksKey}] in cells: ${cells}`)
-                  
-                  // Highlight these cells with blue
-                  cells.forEach(cellK => {
-                    const [x, y] = ktoxy(cellK)
-                    console.log(`Highlighting naked pair cell at [${x}, ${y}], k=${cellK} with blue`)
+              // Now check for naked pairs (cells with exactly the same 2 center marks)
+              if (centreMarkCells.length >= 2) {
+                console.log(`Checking ${centreMarkCells.length} cells with center marks containing ${selectedDigit.digit}`)
+                
+                // Group cells by their center mark content (as a sorted string)
+                const cellsByCentreMarks = new Map<string, number[]>()
+                centreMarkCells.forEach(cellK => {
+                  const marks = game.centreMarks.get(cellK)
+                  if (marks && marks.size === 2) { // Only interested in cells with exactly 2 center marks
+                    const marksArray = Array.from(marks).sort()
+                    const marksKey = marksArray.join(',')
                     
-                    // Add to highlight system with same priority as corner pairs
-                    const priority = 3 // Blue priority
-                    addHighlightedCell(cellK, BLUE_COLOR, priority)
-                  })
-                }
-              })
+                    if (!cellsByCentreMarks.has(marksKey)) {
+                      cellsByCentreMarks.set(marksKey, [])
+                    }
+                    cellsByCentreMarks.get(marksKey)!.push(cellK)
+                    console.log(`Cell ${cellK} has center marks: ${marksArray}, key: ${marksKey}`)
+                  }
+                })
+                
+                // Check each group for pairs
+                cellsByCentreMarks.forEach((cells, marksKey) => {
+                  // Only highlight if it's a pair (exactly 2 cells with the same center marks)
+                  if (cells.length === 2) {
+                    // Convert the key back to an array to check if it contains the selected digit
+                    const markDigits = marksKey.split(',').map(d => {
+                      // Handle both string and number conversions
+                      return isNaN(Number(d)) ? d : Number(d)
+                    })
+                    
+                    // Verify again that the naked pair contains the selected digit
+                    if (markDigits.includes(selectedDigit.digit)) {
+                      console.log(`Found naked pair with digits [${marksKey}] including selected digit ${selectedDigit.digit} in cells: ${cells}`)
+                      
+                      // Highlight these cells with blue
+                      cells.forEach(cellK => {
+                        const [x, y] = ktoxy(cellK)
+                        console.log(`Highlighting naked pair cell at [${x}, ${y}], k=${cellK} with blue`)
+                        
+                        // Add to highlight system with same priority as corner pairs
+                        const priority = 3 // Blue priority
+                        addHighlightedCell(cellK, BLUE_COLOR, priority)
+                      })
+                    } else {
+                      console.log(`Ignoring naked pair [${marksKey}] as it doesn't include selected digit ${selectedDigit.digit}`)
+                    }
+                  }
+                })
+              }
             }
           }
         }
