@@ -90,6 +90,8 @@ interface PersistentGameState {
   penLines: Set<number>
   fogLights?: FogLight[]
   fogRaster?: number[][]
+  undoStates?: PersistentGameState[]
+  nextUndoState?: number
 }
 
 export interface GameState extends PersistentGameState {
@@ -510,23 +512,24 @@ function marksReducer(
         })
       }
       
-      // Process all rows, columns and boxes
+      // Only process 3x3 boxes for naked pairs
+      // In standard Sudoku, naked pairs only apply within a single 3x3 box
       
-      // Process rows
-      for (let row = 0; row < 9; row++) {
-        const rowCells = Array.from({ length: 9 }, (_, col) => xytok(col, row))
-        const nakedPairs = findNakedPairs(rowCells, state.cornerMarks)
-        nakedPairs.forEach(convertPairToCenter)
+      // Helper function to check if two cells are in the same box
+      const areInSameBox = (cell1: number, cell2: number): boolean => {
+        const [x1, y1] = ktoxy(cell1)
+        const [x2, y2] = ktoxy(cell2)
+        
+        // Check if they're in the same 3x3 box
+        const boxRow1 = Math.floor(y1 / 3)
+        const boxCol1 = Math.floor(x1 / 3)
+        const boxRow2 = Math.floor(y2 / 3)
+        const boxCol2 = Math.floor(x2 / 3)
+        
+        return boxRow1 === boxRow2 && boxCol1 === boxCol2
       }
       
-      // Process columns
-      for (let col = 0; col < 9; col++) {
-        const colCells = Array.from({ length: 9 }, (_, row) => xytok(col, row))
-        const nakedPairs = findNakedPairs(colCells, state.cornerMarks)
-        nakedPairs.forEach(convertPairToCenter)
-      }
-      
-      // Process boxes
+      // Process boxes only
       for (let boxRow = 0; boxRow < 3; boxRow++) {
         for (let boxCol = 0; boxCol < 3; boxCol++) {
           const boxCells: number[] = []
@@ -1060,16 +1063,7 @@ function gameReducerNoUndo(state: GameState, mode: string, action: Action) {
       )
 
       if (changed) {
-        // Automatically check if the puzzle is solved after placing a digit
-        const errors = checkReducer(
-          state.digits,
-          state.data?.cells,
-          state.data?.solution,
-        )
-        state.errors = errors
-        state.solved = errors.type === "solved"
-        state.checkCounter++
-
+        // Only update fog lights when digits change, but don't auto-check for completion
         if (state.data.fogLights !== undefined) {
           // update fog lights after digits have changed
           state.fogLights = makeFogLights(state.data, state.digits)
@@ -1107,19 +1101,16 @@ function makeUndoState(state: PersistentGameState): PersistentGameState {
     penLines: state.penLines,
     fogLights: state.fogLights,
     fogRaster: state.fogRaster,
+    // Don't include undoStates in the undo state itself to avoid recursive copies
   }
 }
 
 // Helper functions for serializing/deserializing game state
 const STORAGE_KEY_PREFIX = "sudocle_game_"
 
-// Convert Maps and Sets to arrays for JSON serialization
-function serializeGameState(
-  state: PersistentGameState,
-  puzzleId: string,
-): string {
-  // Create a serializable version of the state
-  const serialized = {
+// Helper function to convert a PersistentGameState to a serializable object
+function stateToSerializable(state: PersistentGameState) {
+  return {
     digits: Array.from(state.digits.entries()),
     cornerMarks: Array.from(state.cornerMarks.entries()).map(([k, v]) => [
       k,
@@ -1133,10 +1124,50 @@ function serializeGameState(
     penLines: Array.from(state.penLines),
     fogLights: state.fogLights,
     fogRaster: state.fogRaster,
+  }
+}
+
+// Convert Maps and Sets to arrays for JSON serialization
+function serializeGameState(
+  state: PersistentGameState,
+  puzzleId: string,
+): string {
+  // Create a serializable version of the state
+  const serialized: any = {
+    ...stateToSerializable(state),
     puzzleId,
   }
 
+  // Include undo states if they exist
+  if (state.undoStates && state.undoStates.length > 0) {
+    serialized.undoStates = state.undoStates.map(stateToSerializable)
+    serialized.nextUndoState = state.nextUndoState || 0
+  }
+
   return JSON.stringify(serialized)
+}
+
+// Helper function to convert serialized data back to PersistentGameState
+function deserializeStateObject(parsed: any): PersistentGameState {
+  return {
+    digits: new Map(parsed.digits || []),
+    cornerMarks: new Map(
+      (parsed.cornerMarks || []).map(([k, v]: [number, Array<number | string>]) => [
+        k,
+        new Set(v),
+      ]),
+    ),
+    centreMarks: new Map(
+      (parsed.centreMarks || []).map(([k, v]: [number, Array<number | string>]) => [
+        k,
+        new Set(v),
+      ]),
+    ),
+    colours: new Map(parsed.colours || []),
+    penLines: new Set(parsed.penLines || []),
+    fogLights: parsed.fogLights,
+    fogRaster: parsed.fogRaster,
+  }
 }
 
 // Convert arrays back to Maps and Sets when deserializing
@@ -1148,24 +1179,12 @@ function deserializeGameState(json: string): [PersistentGameState, string] {
     const puzzleId = parsed.puzzleId || ""
 
     // Recreate the state with proper Maps and Sets
-    const state: PersistentGameState = {
-      digits: new Map(parsed.digits),
-      cornerMarks: new Map(
-        parsed.cornerMarks.map(([k, v]: [number, Array<number | string>]) => [
-          k,
-          new Set(v),
-        ]),
-      ),
-      centreMarks: new Map(
-        parsed.centreMarks.map(([k, v]: [number, Array<number | string>]) => [
-          k,
-          new Set(v),
-        ]),
-      ),
-      colours: new Map(parsed.colours),
-      penLines: new Set(parsed.penLines),
-      fogLights: parsed.fogLights,
-      fogRaster: parsed.fogRaster,
+    const state = deserializeStateObject(parsed)
+
+    // Process undo states if they exist
+    if (parsed.undoStates && Array.isArray(parsed.undoStates) && parsed.undoStates.length > 0) {
+      state.undoStates = parsed.undoStates.map(deserializeStateObject)
+      state.nextUndoState = typeof parsed.nextUndoState === 'number' ? parsed.nextUndoState : 0
     }
 
     return [state, puzzleId]
@@ -1235,7 +1254,20 @@ function saveGameState(state: GameState) {
   if (!puzzleId || !state.data || state.data.cells.length === 0) return
 
   try {
-    const serialized = serializeGameState(state, puzzleId)
+    // Create a persistent state that includes the undo history
+    const persistentState: PersistentGameState = {
+      digits: state.digits,
+      cornerMarks: state.cornerMarks,
+      centreMarks: state.centreMarks,
+      colours: state.colours,
+      penLines: state.penLines,
+      fogLights: state.fogLights,
+      fogRaster: state.fogRaster,
+      undoStates: state.undoStates,
+      nextUndoState: state.nextUndoState
+    }
+    
+    const serialized = serializeGameState(persistentState, puzzleId)
     localStorage.setItem(STORAGE_KEY_PREFIX + puzzleId, serialized)
   } catch (e) {
     console.error("Failed to save game state:", e)
@@ -1407,6 +1439,9 @@ export const useGame = create<GameStateWithActions>()(
               penLines: savedState.penLines,
               fogLights: savedState.fogLights || baseState.fogLights,
               fogRaster: savedState.fogRaster || baseState.fogRaster,
+              // Restore undo history if available
+              undoStates: savedState.undoStates || [],
+              nextUndoState: savedState.nextUndoState || 0,
             }
           }
 

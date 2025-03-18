@@ -404,53 +404,74 @@ const IndexPage = () => {
             return count
           }
 
-          // Skip digits that already have 9 instances filled in
+          // Try to find cells with the target digit, checking all possible digits if needed
+          let foundCells = false
           let skippedDigits = 0
-          while (countDigitInstances(targetDigit) >= 9 && skippedDigits < 9) {
-            skippedDigits++
-            if (goingForward) {
-              targetDigit = targetDigit === 9 ? 1 : targetDigit + 1
-            } else {
-              targetDigit = targetDigit === 1 ? 9 : targetDigit - 1
-            }
-          }
-
-          // Find all cells with the target digit
-          const targetDigitCells: {
+          let targetDigitCells: {
             k: number
             x: number
             y: number
             distance: number
-          }[] = []
-
-          // Search through all cells for the target digit
-          game.digits.forEach((digit, k) => {
-            if (
-              typeof digit.digit === "number" &&
-              digit.digit === targetDigit
-            ) {
-              const [x, y] = ktoxy(k)
-
-              // Calculate Euclidean distance from selected cell
-              const distance = Math.sqrt(
-                Math.pow(x - selectedX, 2) + Math.pow(y - selectedY, 2),
-              )
-
-              targetDigitCells.push({ k, x, y, distance })
+          }[] = [];
+          
+          // Loop until we find cells or we've checked all digits
+          while (!foundCells && skippedDigits < 9) {
+            // Skip digits that already have 9 instances filled in
+            if (countDigitInstances(targetDigit) >= 9) {
+              skippedDigits++;
+              if (goingForward) {
+                targetDigit = targetDigit === 9 ? 1 : targetDigit + 1;
+              } else {
+                targetDigit = targetDigit === 1 ? 9 : targetDigit - 1;
+              }
+              continue;
             }
-          })
-
-          // If we found cells with the target digit, select the closest one
+            
+            // Find all cells with the target digit
+            targetDigitCells = [];
+            
+            // Search through all cells for the target digit
+            game.digits.forEach((digit, k) => {
+              if (
+                typeof digit.digit === "number" &&
+                digit.digit === targetDigit
+              ) {
+                const [x, y] = ktoxy(k);
+                
+                // Calculate Euclidean distance from selected cell
+                const distance = Math.sqrt(
+                  Math.pow(x - selectedX, 2) + Math.pow(y - selectedY, 2),
+                );
+                
+                targetDigitCells.push({ k, x, y, distance });
+              }
+            });
+            
+            // If we found cells with the target digit, we're done searching
+            if (targetDigitCells.length > 0) {
+              foundCells = true;
+            } else {
+              // If we didn't find cells, try the next digit
+              skippedDigits++;
+              if (goingForward) {
+                targetDigit = targetDigit === 9 ? 1 : targetDigit + 1;
+              } else {
+                targetDigit = targetDigit === 1 ? 9 : targetDigit - 1;
+              }
+            }
+          }
+          
+          // If we found cells with a target digit, select the closest one
           if (targetDigitCells.length > 0) {
             // Sort by distance (closest first)
-            targetDigitCells.sort((a, b) => a.distance - b.distance)
-
+            targetDigitCells.sort((a, b) => a.distance - b.distance);
+            
             // Select the closest cell
             updateGame({
               type: TYPE_SELECTION,
               action: ACTION_SET,
               k: targetDigitCells[0].k,
-            })
+            });
           }
         }
 
